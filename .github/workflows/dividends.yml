@@ -1,0 +1,43 @@
+name: Dividend data
+
+# Yahoo per-symbol dividends -> dividends.json, published as its own Release asset.
+# Independent of the earnings workflow (runs in parallel, fails in isolation).
+# App fetches:
+#   https://github.com/vishnuamuthiah/TradeVision-data/releases/download/dividends-latest/dividends.json
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"   # Mondays 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: dividend-data
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120   # ~10k per-symbol Yahoo requests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Scrape dividends
+        env:
+          YAHOO_DELAY: "0.2"
+          OUT_PATH: "data/dividends.json"
+        run: python scraper/build_dividends.py
+
+      - name: Publish as Release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete dividends-latest --yes --cleanup-tag || true
+          gh release create dividends-latest data/dividends.json \
+            --title "Dividend data (latest)" \
+            --notes "Auto-generated $(date -u '+%Y-%m-%d %H:%M UTC')"
