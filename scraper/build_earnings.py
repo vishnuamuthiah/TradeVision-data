@@ -22,7 +22,7 @@ import sys
 import time
 from datetime import date, datetime, timedelta, timezone
 
-from common import fetch_json, trading_days, write_output, NASDAQ_HEADERS
+from common import fetch_json, trading_days, write_output, load_published_tickers, NASDAQ_HEADERS
 
 DAYS_BACK = int(os.environ.get("DAYS_BACK", "400"))         # ~4 quarters of history
 DAYS_FORWARD = int(os.environ.get("DAYS_FORWARD", "100"))   # announced upcoming reports
@@ -54,8 +54,19 @@ def build():
     print(f"Earnings scan {start} .. {end}", file=sys.stderr)
     earnings = scrape(start, end)
 
+    # Restrict to the optionable universe published weekly by the tickers feed — the
+    # app only prices optionable underlyings, so non-optionable names are unusable. If
+    # the asset is unavailable, emit unfiltered rather than blocking the publish.
+    allow = set(load_published_tickers())
+    if allow:
+        print(f"Filtering to {len(allow)} optionable symbols", file=sys.stderr)
+    else:
+        print("WARNING: optionable list unavailable — emitting unfiltered earnings", file=sys.stderr)
+
     tickers = {}
     for sym, dates in earnings.items():
+        if allow and sym not in allow:
+            continue
         ds = sorted(dates)
         past = [d for d in ds if d <= today_iso][-4:]
         future = [d for d in ds if d > today_iso]

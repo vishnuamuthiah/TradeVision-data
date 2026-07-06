@@ -6,11 +6,12 @@ Yahoo (not Nasdaq) because Nasdaq's dividend API silently drops many major NYSE
 payers (KO, JNJ, PG, XOM...). This build is fully independent of the earnings build
 (they run in parallel).
 
-Universe = Cboe's option-listed symbol directory (~5.3k names), NOT the full ~10.4k
-SEC ticker list. TradeVision only prices options strategies, so the only underlyings
-it can ever look up are optionable ones; the SEC universe pushed past Yahoo's ~7,500
-throttle (Actions IP stalls near 7,500, then 429s the S-Z tail into the timeout).
-The Cboe list is under that throttle point.
+Universe = the optionable list published weekly by the tickers feed (Cboe's ~5.3k
+option-listed names), NOT the full ~10.4k SEC ticker list. TradeVision only prices
+options strategies, so the only underlyings it can ever look up are optionable ones;
+the SEC universe pushed past Yahoo's ~7,500 throttle (Actions IP stalls near 7,500,
+then 429s the S-Z tail into the timeout). The Cboe list is under that throttle point.
+Falls back to a direct Cboe fetch if the published tickers asset is unavailable.
 
 Schema (keyed by symbol; app projects further-out ex-dates from `frequency` with "~"):
 
@@ -23,38 +24,19 @@ Schema (keyed by symbol; app projects further-out ex-dates from `frequency` with
       }
     }
 """
-import csv
-import io
 import os
 import random
 import sys
 import time
 from datetime import date, datetime, timedelta, timezone
 
-from common import fetch_text, fetch_json, write_output, YAHOO_UA, BROWSER_UA
+from common import fetch_json, write_output, cboe_universe, load_published_tickers, YAHOO_UA
 
 # ~0.4s + jitter keeps us comfortably under Yahoo's rate limiter across the ~5.3k
 # optionable universe; jitter avoids a perfectly periodic request pattern.
 YAHOO_DELAY = float(os.environ.get("YAHOO_DELAY", "0.4"))
 YAHOO_JITTER = float(os.environ.get("YAHOO_JITTER", "0.2"))
 OUT_PATH = os.environ.get("OUT_PATH", "data/dividends.json")
-# Cboe's downloadable equity+index options symbol directory — the canonical
-# "optionable" list. Column 1 (0-indexed) is the stock symbol.
-CBOE_URL = ("https://www.cboe.com/us/options/symboldir/equity_index_options/"
-            "?download=csv")
-
-
-def universe():
-    """Option-listed symbols from Cboe's symbol directory (class shares use '.',
-    matching SEC/`yahoo_symbol` conventions, e.g. BRK.B)."""
-    text = fetch_text(CBOE_URL, {"User-Agent": BROWSER_UA})
-    if not text:
-        return []
-    rows = csv.reader(io.StringIO(text))
-    next(rows, None)  # header: Company Name, Stock Symbol, DPM Name, ...
-    syms = {row[1].strip().upper() for row in rows if len(row) > 1 and row[1].strip()}
-    syms.discard("")
-    return sorted(syms)
 
 
 def yahoo_symbol(sym):
@@ -91,10 +73,10 @@ def fetch_dividend(symbol):
 
 
 def build():
-    syms = universe()
+    syms = load_published_tickers() or cboe_universe()
     if len(syms) < 3000:
-        sys.exit(f"ERROR: Cboe universe only {len(syms)} symbols — fetch failed.")
-    print(f"Universe: {len(syms)} symbols (Cboe optionable)", file=sys.stderr)
+        sys.exit(f"ERROR: optionable universe only {len(syms)} symbols — fetch failed.")
+    print(f"Universe: {len(syms)} symbols (optionable)", file=sys.stderr)
 
     dividends = {}
     for i, sym in enumerate(syms, 1):

@@ -2,12 +2,16 @@ name: Earnings data
 
 # Nasdaq earnings calendar -> earnings.json, published as its own Release asset.
 # Independent of the dividend workflow (runs in parallel, fails in isolation).
+# Triggered after the Tickers workflow completes so it filters to the freshly
+# refreshed optionable universe. Runs regardless of the tickers conclusion — if that
+# run hiccupped, the build falls back to the last-published tickers asset.
 # App fetches:
 #   https://github.com/vishnuamuthiah/TradeVision-data/releases/download/earnings-latest/earnings.json
 
 on:
-  schedule:
-    - cron: "0 8 * * 1"   # Mondays 08:00 UTC
+  workflow_run:
+    workflows: ["Tickers data"]
+    types: [completed]
   workflow_dispatch: {}
 
 permissions:

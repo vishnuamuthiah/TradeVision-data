@@ -1,0 +1,43 @@
+name: Tickers data
+
+# Cboe optionable symbol directory -> tickers.json, published as its own Release asset.
+# Runs first each week, then triggers the earnings + dividend workflows (via
+# `workflow_run`) so all three feeds share one weekly-refreshed optionable universe.
+# Downstream fetches:
+#   https://github.com/vishnuamuthiah/TradeVision-data/releases/download/tickers-latest/tickers.json
+
+on:
+  schedule:
+    - cron: "0 8 * * 1"   # Mondays 08:00 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tickers-data
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build optionable universe
+        env:
+          OUT_PATH: "data/tickers.json"
+        run: python scraper/build_tickers.py
+
+      - name: Publish as Release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete tickers-latest --yes --cleanup-tag || true
+          gh release create tickers-latest data/tickers.json \
+            --title "Tickers data (latest)" \
+            --notes "Auto-generated $(date -u '+%Y-%m-%d %H:%M UTC')"

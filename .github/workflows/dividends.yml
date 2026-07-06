@@ -2,12 +2,17 @@ name: Dividend data
 
 # Yahoo per-symbol dividends -> dividends.json, published as its own Release asset.
 # Independent of the earnings workflow (runs in parallel, fails in isolation).
+# Triggered after the Tickers workflow completes so it iterates the freshly refreshed
+# optionable universe. Runs regardless of the tickers conclusion — if that run
+# hiccupped, the build falls back to the last-published tickers asset, then to a
+# direct Cboe fetch.
 # App fetches:
 #   https://github.com/vishnuamuthiah/TradeVision-data/releases/download/dividends-latest/dividends.json
 
 on:
-  schedule:
-    - cron: "0 8 * * 1"   # Mondays 08:00 UTC
+  workflow_run:
+    workflows: ["Tickers data"]
+    types: [completed]
   workflow_dispatch: {}
 
 permissions:

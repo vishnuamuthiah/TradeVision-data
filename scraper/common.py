@@ -1,4 +1,6 @@
-"""Shared helpers for the TradeVision data scrapers (earnings + dividends)."""
+"""Shared helpers for the TradeVision data scrapers (tickers + earnings + dividends)."""
+import csv
+import io
 import json
 import os
 import sys
@@ -17,6 +19,15 @@ NASDAQ_HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "en-US,en;q=0.9",
 }
+
+# Cboe's downloadable equity+index options symbol directory — the canonical
+# "optionable" list (~5.3k names). Column 1 (0-indexed) is the stock symbol.
+CBOE_URL = ("https://www.cboe.com/us/options/symboldir/equity_index_options/"
+            "?download=csv")
+# The tickers feed publishes the optionable universe here weekly; the earnings and
+# dividend builds consume it so all three feeds share one universe.
+TICKERS_URL = ("https://github.com/vishnuamuthiah/TradeVision-data/releases/download/"
+               "tickers-latest/tickers.json")
 
 
 def fetch_json(url, headers, retries=5, backoff_codes=(429, 502, 503, 999)):
@@ -69,3 +80,25 @@ def write_output(path, obj, label):
         json.dump(obj, f, separators=(",", ":"))
     mb = os.path.getsize(path) / 1_048_576
     print(f"Wrote {path}: {label} ({mb:.2f} MB)", file=sys.stderr)
+
+
+def cboe_universe():
+    """Option-listed symbols from Cboe's symbol directory (class shares use '.',
+    matching SEC/`yahoo_symbol` conventions, e.g. BRK.B). Sorted, deduped, uppercase.
+    Returns [] if the fetch fails."""
+    text = fetch_text(CBOE_URL, {"User-Agent": BROWSER_UA})
+    if not text:
+        return []
+    rows = csv.reader(io.StringIO(text))
+    next(rows, None)  # header: Company Name, Stock Symbol, DPM Name, ...
+    syms = {row[1].strip().upper() for row in rows if len(row) > 1 and row[1].strip()}
+    syms.discard("")
+    return sorted(syms)
+
+
+def load_published_tickers():
+    """The optionable universe published weekly by the tickers feed, as a list of
+    symbols. Returns [] on any failure so callers can fall back gracefully."""
+    data = fetch_json(TICKERS_URL, {"User-Agent": BROWSER_UA})
+    syms = (data or {}).get("symbols")
+    return syms if isinstance(syms, list) else []
