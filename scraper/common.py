@@ -36,6 +36,23 @@ def fetch_json(url, headers, retries=5, backoff_codes=(429, 502, 503, 999)):
     return None
 
 
+def fetch_text(url, headers, retries=5, backoff_codes=(429, 502, 503, 999)):
+    """GET a text/CSV body with the same polite backoff as fetch_json.
+    Returns the decoded body, or None after retries."""
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=25) as r:
+                return r.read().decode("utf-8", "replace")
+        except urllib.error.HTTPError as e:
+            if e.code not in backoff_codes:
+                return None
+            time.sleep(2 ** attempt)
+        except (urllib.error.URLError, TimeoutError):
+            time.sleep(2 ** attempt)
+    return None
+
+
 def trading_days(start, end):
     """Weekdays in [start, end] inclusive (Mon–Fri)."""
     d = start

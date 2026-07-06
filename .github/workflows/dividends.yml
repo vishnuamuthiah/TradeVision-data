@@ -20,7 +20,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 120   # ~10k per-symbol Yahoo requests
+    timeout-minutes: 90   # ~5.3k optionable per-symbol Yahoo requests @ ~0.5s
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -29,7 +29,8 @@ jobs:
 
       - name: Scrape dividends
         env:
-          YAHOO_DELAY: "0.2"
+          YAHOO_DELAY: "0.4"
+          YAHOO_JITTER: "0.2"
           OUT_PATH: "data/dividends.json"
         run: python scraper/build_dividends.py
 
