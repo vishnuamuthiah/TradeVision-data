@@ -1,0 +1,33 @@
+/* TradeVision legal/support pages — mirrors the app's dark navy + cyan palette. */
+:root {
+  --bg: rgb(13, 15, 28);
+  --panel: rgb(25, 27, 40);
+  --accent: rgb(107, 204, 245);
+  --text: rgba(255, 255, 255, 0.87);
+  --muted: rgba(255, 255, 255, 0.55);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+main { max-width: 720px; margin: 0 auto; padding: 48px 24px 64px; }
+h1 { font-size: 30px; margin: 0 0 4px; color: #fff; }
+h2 { font-size: 19px; margin: 28px 0 6px; color: var(--accent); }
+p { margin: 8px 0; }
+a { color: var(--accent); }
+.effective { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+.fine { color: var(--muted); font-size: 13px; margin-top: 36px; border-top: 1px solid rgba(255,255,255,0.12); padding-top: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; margin-bottom: 28px; }
+.brand svg { flex: none; }
+.brand span { font-weight: 700; font-size: 20px; color: #fff; }
+.brand a { text-decoration: none; }
+nav.docs { display: grid; gap: 12px; margin-top: 24px; }
+nav.docs a {
+  display: block; padding: 16px 18px; background: var(--panel);
+  border: 1px solid rgba(255,255,255,0.10); border-radius: 14px;
+  color: #fff; text-decoration: none; font-weight: 600;
+}
+nav.docs a small { display: block; color: var(--muted); font-weight: 400; font-size: 14px; margin-top: 2px; }
