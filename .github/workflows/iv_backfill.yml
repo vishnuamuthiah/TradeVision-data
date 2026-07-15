@@ -1,0 +1,40 @@
+name: IV backfill (one-time seed)
+
+# One-time (manual) seed of data/history.csv: 52 weeks of constant-maturity iv30 for
+# the 400 symbols, from MarketData.app historical chains (Black-Scholes on the ATM mid).
+# Needs a MarketData token in the MD_TOKEN repo secret. Costs ~21k credits (one day of a
+# Trader plan). After this runs once, the weekly iv.yml workflow maintains the series for
+# free from Cboe. Normally you won't run this — the seed is already committed.
+
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Backfill 52-week IV history from MarketData
+        env:
+          MD_TOKEN: ${{ secrets.MD_TOKEN }}
+          OUT_PATH: "data/history.csv"
+          SYMBOLS: "data/iv_symbols.csv"
+          WEEKS: "52"
+          WORKERS: "8"
+        run: python scraper/build_iv_backfill.py
+
+      - name: Commit seeded history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/history.csv
+          git diff --cached --quiet || git commit -m "IV history: MarketData 52-week backfill seed"
+          git push

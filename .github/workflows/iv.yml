@@ -1,0 +1,54 @@
+name: IV data (weekly)
+
+# Appends this week's Cboe iv30 to data/history.csv, recomputes the rolling 52-week
+# window, commits the updated history back to the repo, and publishes data/iv.json as
+# its own Release asset. Free (no MarketData token) — the one-time seed came from the
+# backfill workflow; this job carries the series forward.
+#   App fetches:
+#   https://github.com/vishnuamuthiah/TradeVision-data/releases/download/iv-latest/iv.json
+
+on:
+  schedule:
+    - cron: "0 14 * * 6"   # Saturdays 14:00 UTC — captures Friday's EOD iv30
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: iv-data
+  cancel-in-progress: false   # never cancel a run mid-commit
+
+jobs:
+  weekly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Append Cboe iv30 + recompute rolling window
+        env:
+          HISTORY_PATH: "data/history.csv"
+          OUT_PATH: "data/iv.json"
+          SYMBOLS: "data/iv_symbols.csv"
+        run: python scraper/build_iv_weekly.py
+
+      - name: Commit updated history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/history.csv
+          git diff --cached --quiet || git commit -m "IV history: weekly Cboe append ($(date -u '+%Y-%m-%d'))"
+          git push
+
+      - name: Publish iv.json as Release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release delete iv-latest --yes --cleanup-tag || true
+          gh release create iv-latest data/iv.json \
+            --title "IV data (latest)" \
+            --notes "Auto-generated $(date -u '+%Y-%m-%d %H:%M UTC')"
